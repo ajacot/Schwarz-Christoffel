@@ -1,5 +1,4 @@
-Schwarz-Christoffel Mappings
- from the disk
+Schwarz-Christoffel Mappings from the disk
 ==========================================
 
 
