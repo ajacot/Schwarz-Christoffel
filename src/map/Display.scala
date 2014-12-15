@@ -96,8 +96,7 @@ object Display{
     		    new Path(Double.inclusive(rect.y, rect.y + rect.height, steps_size).map((Y) => f(Complex(X, Y)))))
     	   ++ Double.inclusive(rect.y, rect.y + rect.height, grid_width).map((Y) => 
     		    new Path(Double.inclusive(rect.x, rect.x + rect.width, steps_size).map((X) => f(Complex(X, Y)))))
-      );//new Array[Display](num + (rect.height / grid_width).toInt);
-	  
+      );
 	  
 	  return displays;
   }
@@ -148,7 +147,6 @@ object Rect{
   def boundsOf(ps : Seq[Complex[Double]]) : Rect = {
     if(ps.length==0) return new Rect(0, 0, 0, 0);
     
-    //var out : Rect = new Rect(ps(0).real, ps(0).imag, ps(0).real, ps(0).imag);
     var minX = ps(0).real;
     var maxX = ps(0).real;
     var minY = ps(0).imag;
@@ -182,16 +180,4 @@ object Rect{
       return new Rect(frame.x - bounds.x*scaleX, frame.y + frame.height + bounds.y*scaleX - (frame.height-bounds.height*scaleX)/2, scaleX, -scaleX);
     }
   }
-  
-  /*
-  def getScale(bounds : Rect, frame : Rect) : Rect = {
-    val scaleX = frame.width / bounds.width;
-    val scaleY = frame.height / bounds.height;
-    
-    if(Math.abs(scaleX) > Math.abs(scaleY)){
-      return new Rect(frame.x - bounds.x/scaleY + (frame.width-bounds.width*scaleY*Math.signum(scaleX))/2, frame.y - bounds.y/scaleY, scaleY*Math.signum(scaleX), scaleY*Math.signum(scaleX));
-    }else{
-      return new Rect(frame.x - bounds.x/scaleX, frame.y - bounds.y/scaleX + (frame.height-bounds.height*scaleX*Math.signum(scaleY))/2, scaleX*Math.signum(scaleY), scaleX*Math.signum(scaleY));
-    }
-  }*/
 }

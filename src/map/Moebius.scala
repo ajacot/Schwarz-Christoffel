@@ -78,6 +78,7 @@ object Moebius{
   lazy val roll_back : Moebius = new Moebius(Complex(1, 2), 1, 1, Complex(1, -2));
 }
 
+// disk automorphisms, I actually don't use this representation.
 class DiskAutomorphism(val p : Complex[Double], val theta : Double, val ordre : Boolean){
   def apply(w : Complex[Double]) : Complex[Double] = {
     val v = Complex.polar(1.0, theta);

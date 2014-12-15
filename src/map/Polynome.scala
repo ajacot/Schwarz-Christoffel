@@ -8,6 +8,8 @@ import map.CRDTMap
 import map.DoubleMap
 import spire.math.Complex.doubleToComplex
 
+// this part is not really used
+
 class Polynome (val quotients : IndexedSeq[Complex[Double]]) {
 	def apply(z : Complex[Double]) : Complex[Double] = 
 	  quotients.foldLeft[(Complex[Double], Complex[Double])]((0.0, 1.0))((st, q) => (st._1 + q * st._2, st._2 * z))._1;

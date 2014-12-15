@@ -9,7 +9,7 @@ import spire.math.Complex.intToComplex
 @SerialVersionUID(103L)
 class Triangulation(val diagonals : IndexedSeq[Diagonal]) extends Serializable{
   
-  var displays : Seq[Display] = Seq.empty;
+  //var displays : Seq[Display] = Seq.empty;
   
   def getDisplay(poly : Polygon) : Display = {
     val displays = new Array[Display](diagonals.length+1);
@@ -23,6 +23,7 @@ class Triangulation(val diagonals : IndexedSeq[Diagonal]) extends Serializable{
     return new DisplayArray(displays);
   }
   
+  // get the unique embedding (up to rotation) with the quadrilateral around the diagonal start a rectangle, and having the good cross-ratios.
   def get_pre_angles(start : Int, cross_ratios : IndexedSeq[Double], pre_vertices : Array[Complex[Double]]){
     def next(ie : Int){
       if(ie > 0){
@@ -104,8 +105,10 @@ class Triangulation(val diagonals : IndexedSeq[Diagonal]) extends Serializable{
     return (start, z) +: (next(z, diag.ab, b, c, a) ++ next(z, diag.bc, c, a, b) ++ next(z, diag.cd, d, a, c) ++ next(z, diag.da, a, c, d));
   }
   
-  def getCuts(poly : Polygon, idA : Int, idB : Int) : Int = Math.ceil((poly.points(idB) - poly.points(idA)).abs / (2*getGeodesicDistance(poly, idA, idB)._1)).toInt
+  def getCuts(poly : Polygon, idA : Int, idB : Int, lambda : Double = 2.0) : Int = Math.ceil((poly.points(idB) - poly.points(idA)).abs / (lambda*getGeodesicDistance(poly, idA, idB)._1)).toInt
   
+  // returns the nearest non neighbouring edge to the edge (idA, idB).
+  // Also returns the "parts" for each triangle.
   def getGeodesicDistance(poly : Polygon, idA : Int, idB : Int) : (Double, Array[Seq[PathDiv]]) = { // , Array[Double], Array[Seq[PathDiv]], Array[Int]
     //val distances = new Array[Double](poly.n);
     val info = new Array[Seq[PathDiv]](poly.n);
@@ -252,10 +255,11 @@ class Triangulation(val diagonals : IndexedSeq[Diagonal]) extends Serializable{
       }
     }
     
-    return (min_dist, info);//(distances, info, back);
+    return (min_dist, info);
   }
   
   
+  // finds the diagonal sich that its middle point is the nearest to z.
   def nearest_diag(z : Complex[Double], poly : Polygon) : Int = {
     val dist = (i_diag : Int) => {
       val diag = diagonals(i_diag);
@@ -268,6 +272,8 @@ class Triangulation(val diagonals : IndexedSeq[Diagonal]) extends Serializable{
     return (0 until poly.n-3).toStream.min(Ordering.by(dist));
   }
   
+  // gives an alternative vector of inner angles such that all triangles of the triangulation will kind of look like
+  // equilateral triangles (all angles are multiple of pi / 3).
   def equi_inner_angles : Array[Double] = {
     val out = new Array[Double](diagonals.length + 3);
     for(id <- 0 until out.length) out(id) = Math.PI / 3;
@@ -278,7 +284,9 @@ class Triangulation(val diagonals : IndexedSeq[Diagonal]) extends Serializable{
     
     return out;
   }
-  
+  	// finds for each diagonal i_diag the constants Css(i_diag) and Ass(i_diag) so that the functions that we get with
+  	// getDiskMap will be mapped to the same polygon.
+   	// additionally, if the array positions is not null, then the vertices of the now unique polygon will be put in this array.
 	def setConstants(start : Int = 0, 
 					cross_ratios : IndexedSeq[Double],
 					angles : IndexedSeq[Double],
@@ -291,7 +299,7 @@ class Triangulation(val diagonals : IndexedSeq[Diagonal]) extends Serializable{
 	  val set_positions = positions != null;
 	  
 	  val pre_vertices = Array.ofDim[Complex[Double]](n-3, n);
-	  //val origin_pre_vertices = new Array[Complex[Double]](n);
+	  
 	  get_pre_angles(start, cross_ratios, pre_vertices(start));
 	  
 	  def next(i_diag : Int, lastC : Complex[Double], lastA : Complex[Double], last_pre_vertices : IndexedSeq[Complex[Double]], x : Complex[Double], y : Complex[Double], z : Complex[Double]){
@@ -565,6 +573,7 @@ object Triangulation{
   def moebius_from_cross_ratio(cross_ratio : Double) : Moebius = 
     Moebius.fromToPoints(-1, Complex(0, -1), 1, -1, Complex.polar(1.0, from_cross_ratio_right(cross_ratio)), 1);
   
+  // the angles for the rectangle inscribed in the disk having a specific cross-ratio
   def from_cross_ratio(cross_ratio : Double) : (Double, Double, Double, Double) = {
     val theta = Math.atan(Math.sqrt(-cross_ratio));
     return (theta, Math.PI - theta, theta - Math.PI, -theta);
@@ -572,6 +581,7 @@ object Triangulation{
   
   def from_cross_ratio_right(cross_ratio : Double) : Double = 2 * Math.atan(cross_ratio);
   
+  // returns the unique point d so that the cross_ratio(x, y, z, d) = cross_ratio
   def from_cross_ratio(cross_ratio : Double, x : Complex[Double], y : Complex[Double], z : Complex[Double]) : Complex[Double] = {
     if(x == y || y == z || z == x) return x;
     //println((x, y, z));
@@ -583,6 +593,7 @@ object Triangulation{
   def cross_ratio(a : Complex[Double], b : Complex[Double], c : Complex[Double], d : Complex[Double]) : Complex[Double] = 
     (d - a) * (b - c) / ((c - d) * (a - b));
   
+  // cross ratio for points on the disk given their angle
   def cross_ratio(a : Double, b : Double, c : Double, d : Double) : Double = 
     Math.sin((d - a) / 2) * Math.sin((b - c) / 2) / (Math.sin((c - d) / 2) * Math.sin((a - b) / 2));
 }
@@ -592,6 +603,8 @@ object Triangulation{
 class Diagonal(val a : Int, val b : Int, val c : Int, val d : Int, 
 			   val ab : Int, val bc : Int, val cd : Int, val da : Int) extends Serializable;
 
+
+// those are the "parts" of the interior when calculating the geodesic distance
 abstract class PathDiv{
   def dist(x : Complex[Double]) : Option[(Double, Double)];
   def dist(a : Complex[Double], b : Complex[Double]) : Option[Double];
@@ -668,8 +681,8 @@ class Strip(val a : Complex[Double], val d : Complex[Double], val init_dist : Do
     val dy = (y - a) / d;
     val ddx = dx.imag * width;
     val ddy = dy.imag * width;
-    val t_x = dx.real;//(dx.real * d.real + dx.imag * d.imag) / (width * width);
-    val t_y = dy.real;//(dy.real * d.real + dy.imag * d.imag) / (width * width);
+    val t_x = dx.real;
+    val t_y = dy.real;
     
     val t_from = Math.max(t_x, 0);
     val t_to = Math.min(t_y, 1);
@@ -709,6 +722,7 @@ class Strip(val a : Complex[Double], val d : Complex[Double], val init_dist : Do
   def from = -1;
 }
 
+// a part that only contains one point
 class One(val origin : Complex[Double], val idO : Int, val d : Complex[Double], val init_dist : Double) extends PathDiv {
   lazy val dist0 = (d - origin).abs;
   lazy val dir = (d - origin).arg;
@@ -738,25 +752,13 @@ object SwingTriangulation extends SimpleSwingApplication {
   val poly = new Polygon(ps);*/
   val poly = Polygon.cut(Polygon.spiral(17));
   
-  //val crosses = poly.getGrid(4, 4);
-  
-  
-  //println(Triangulation.cross_ratio(0.0, 0.5 * Math.PI, Math.PI, Triangulation.from_cross_ratio_right(-1.2)));
   
   
   val tr = Triangulation.delaunay(poly);
   
-  for((a, b) <- Ring.getPairs(0 until poly.n)){
-    println((a, b));
-    //println(((poly.points(b) - poly.points(a)).abs / tr.getGeodesicDistance(poly, a, b)._1).toInt);
-    println(tr.getCuts(poly, a, b));
-  }
-  
   
   val distances = tr.getGeodesicDistance(poly, 8, 9);
-  println();
-  println(distances._1);
-  
+
   /*
   println(distances._3.view.zipWithIndex.mkString("\n"));
   
@@ -773,7 +775,7 @@ object SwingTriangulation extends SimpleSwingApplication {
   val display = new DisplayArray(Array(
 		tr.getDisplay(poly)
 	  , new PointsText(poly.points, (0 until poly.n).map((id) => id.toString))
-	  , new DisplayArray(tr.displays)
+	  //, new DisplayArray(tr.displays)
       , new DisplayArray(distances._2(8).map(_.getDisplay))
 	  //, new Cone(poly.points(13), 13, poly.inner_ranges(13), 0).getDisplay
 	  //, new DisplayArray(cones.map(_.getDisplay))

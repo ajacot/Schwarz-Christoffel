@@ -11,7 +11,7 @@ import scala.util.Random
   
 @SerialVersionUID(105L)
 class AngleRange(val from : Double, val size : Double, private val prob : Boolean) extends Serializable{
-  //private val prob = from + size >= Math.PI * 2
+
   def to : Double = if(prob) from + size - Math.PI * 2 else from + size;
   def isInClosed(theta : Double) : Boolean = 
     if(prob) theta >= from || theta <= from + size - Math.PI * 2
@@ -19,22 +19,7 @@ class AngleRange(val from : Double, val size : Double, private val prob : Boolea
   def isInOpen(theta : Double) : Boolean = 
     if(prob) theta > from || theta < from + size - Math.PI * 2
   		else theta > from && theta < from + size
-  /*
-  def cutAt(theta : Double) : (Seq[AngleRange], Seq[AngleRange]) = {
-  	val a = AngleRange.toRange(from - theta);
-  	val b = AngleRange.toRange(to - theta);
-  	
-  	if(a == b) return (Stream(), Stream());
-  	if(a < b){
-  		if(0 <= a) return (Stream(), Stream(AngleRange.unsafe(a + theta, b + theta)));
-  		if(0 < b) return (Stream(AngleRange.unsafe(a + theta, theta)), Stream(AngleRange.unsafe(theta, b + theta)))
-  		return (Stream(AngleRange.unsafe(a + theta, b + theta)), Stream());
-  	}
-  	val back_theta = AngleRange.toRange(theta + Math.PI);
-  	if(0 < b) return (Stream(AngleRange.size(back_theta, Math.PI)), Stream(AngleRange.unsafe(theta, b + theta), AngleRange.unsafe(a + theta, back_theta)));
-	if(0 < a) return (Stream(AngleRange.unsafe(back_theta, b + theta)), Stream(AngleRange.unsafe(a + theta, back_theta)))
-	return (Stream(AngleRange.unsafe(back_theta, b + theta), AngleRange.unsafe(a + theta, theta)), Stream(AngleRange.size(theta, Math.PI)));
-  }*/
+  
   		
   def cutAt(theta : Double) : (Seq[AngleRange], Seq[AngleRange]) = {
   	if(size == 0) return (Seq(), Seq());
@@ -93,7 +78,6 @@ object AngleRange{
     if(mm <= -Math.PI) return mm + 2*Math.PI;
     if(mm > Math.PI) return mm - 2*Math.PI;
     return mm;
-    //if(theta < 0){return theta%(2*Math.PI) + 2*Math.PI}else{return theta%(2*Math.PI)}
   }
 }
 
@@ -156,6 +140,7 @@ class Polygon (val points : IndexedSeq[Complex[Double]]) extends Serializable {
   def getGrid(num : Int, steps : Int) : (IndexedSeq[Stream[IndexedSeq[Complex[Double]]]], IndexedSeq[Stream[IndexedSeq[Complex[Double]]]]) = 
   {val (x, y) = getGridE(num, steps); return (x.map(_.map(_._1)), y.map(_.map(_._1)));}
   
+  // return a grid on the interior of the polygon allong with the edges where each line starts (to be able to get a better guess for the inverse function)
   def getGridE(num : Int, steps : Int) : (IndexedSeq[Stream[(IndexedSeq[Complex[Double]], Int)]], IndexedSeq[Stream[(IndexedSeq[Complex[Double]], Int)]]) = {
     
     var maxX, minX, maxY, minY : Int = 0;
@@ -175,7 +160,6 @@ class Polygon (val points : IndexedSeq[Complex[Double]]) extends Serializable {
     val d = Math.min(width, height) / steps.toDouble;
     
     
-    //def getHorizontalCrosses(Y: Double) : Stream[Double] =  // (down, up)
     val horizontal_lines = Double.inclusive(points(minY).imag+r, points(maxY).imag, r) map ((Y) => 
       getPairs(Ring.getTriples(0 until points.length).toStream flatMap {case (i0, i1, i2) => {
         val (z0, z1, z2) = (points(i0), points(i1), points(i2));
@@ -225,12 +209,14 @@ class Polygon (val points : IndexedSeq[Complex[Double]]) extends Serializable {
     );
   }
   
+  // utility function
   def getPairs[A](in : Stream[A]) : Stream[(A, A)] = in match {
     case Stream.Empty => return Stream();
     case x #:: Stream.Empty => println("one left");return Stream();
     case x #:: (y #:: xs) => return (x, y) #:: getPairs(xs);
   }
   
+  // the mathematical modulo
   def inRange(i : Int) : Int = {
     val j = i % n;
     if(j < 0){
@@ -240,11 +226,8 @@ class Polygon (val points : IndexedSeq[Complex[Double]]) extends Serializable {
     }
   }
 }
-/*
-class Labi(val right : Option[Labi], val front : Option[Labi], val left : Option[Labi]){
-  def toPoints : Seq[Complex[Double]]
-}
-*/
+
+// represents a permutation on 3 numbers
 class Permutation3(val at1 : Int, val at2 : Int){
   def apply[A](xs : Seq[A]) : Seq[A] = insertAt(at2, insertAt(at1, Seq(xs(0)), xs(1)), xs(2));
   
@@ -256,11 +239,12 @@ class Permutation3(val at1 : Int, val at2 : Int){
 }
 
 object Polygon{
-  //def nonInf(points : IndexedSeq[Complex[Double]]) : Polygon = new Polygon(points.map(new NonInfP(_)));
-  
-  def cut(poly : Polygon) : Polygon = {
+
+  // cuts the polygon to improve the convergence of the CRDT method.
+  // as lambda grows, the number of cuts diminishes
+  def cut(poly : Polygon, lambda : Double = 2.0) : Polygon = {
     val tr = Triangulation.delaunay(poly);
-    val cuts = Ring.getPairs(0 until poly.n).map((t) => Math.max(tr.getCuts(poly, t._1, t._2), 1)).toArray;
+    val cuts = Ring.getPairs(0 until poly.n).map((t) => Math.max(tr.getCuts(poly, t._1, t._2, lambda), 1)).toArray;
     println(cuts mkString " ");
     val points = new Array[Complex[Double]](cuts.view.sum);
     
@@ -277,6 +261,7 @@ object Polygon{
     return new Polygon(points);
   }
   
+  // cuts the polygon and also adds some degenerate inner angles at the corresponding indices in an alternative vector of inner angles.
   def cut(poly : Polygon, ancre : IndexedSeq[Double]) : (Polygon, Array[Double]) = {
     val tr = Triangulation.delaunay(poly);
     val cuts = Ring.getPairs(0 until poly.n).map((t) => Math.max(tr.getCuts(poly, t._1, t._2), 1)).toArray;
@@ -300,7 +285,7 @@ object Polygon{
     return (new Polygon(points), ancre1);
   }
  
-  
+ // creates a random labyrinth and an alternative vector of angles "unfolding" the labyrinth.
   def labyrinth(width : Int, height : Int, dd : Double = 0.8, gen : Random = new Random()) : (Polygon, Seq[Double]) = {
     val visited : Array[Array[Boolean]] = Array.ofDim(width, height);
     
@@ -498,21 +483,6 @@ object SwingPoly extends SimpleSwingApplication {
   }*/
 }
 
-
-
-
-/*
-object Polygon{
-  def main(args:Array[String]) = {
-    val poly = new Polygon(Array(NonInfP(Complex(0, 0)), NonInfP(Complex(1, 0)), InfP(Math.PI / 2 + 0.1, 3 * Math.PI / 2 + 0.1)))
-    println(poly.points.getClass());
-    println(poly.sum_angles - Math.PI * 2.0);
-    println(poly.test);
-    println(-1.75 % 1);
-  }
-  
-  def nonInf(ps : IndexedSeq[Complex[Double]]) : Polygon = new Polygon(ps map (NonInfP(_)))
-}*/
 
 object Ring{
   def getPairs[A](seq : IndexedSeq[A]) : IndexedSeq[(A, A)] = slide(seq) zip seq;

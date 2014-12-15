@@ -15,7 +15,6 @@ class CRDTMap (val triangulation : Triangulation, val cross_ratios : Array[Doubl
 		       val inner_angles : IndexedSeq[Double], val Cs : Array[Complex[Double]], val As : Array[Complex[Double]]) extends Serializable {
 	
 	def getDiskMap(diag : Int) : DiskMap = {
-	  //val pre_vertices = new Array[Complex[Double]](inner_angles.length);
 	  val pre_vertices = new Array[Complex[Double]](inner_angles.length);
 	
 	  triangulation.get_pre_angles(diag, cross_ratios, pre_vertices);
@@ -127,6 +126,7 @@ class CRDTMap (val triangulation : Triangulation, val cross_ratios : Array[Doubl
 	def setConstants(start : Int = 0, points : Array[Complex[Double]] = null, qual : Int = 500) = triangulation.setConstants(start, cross_ratios, inner_angles, Cs, As, points, qual)
 	def setConstantsOnlyC(start : Int = 0, points : Array[Complex[Double]] = null, qual : Int = 500) = triangulation.setConstantsOnlyC(start, cross_ratios, inner_angles, Cs, points, qual);
 	
+	// Returns the disk automorphism that will map the embedding corresponding to from to the embedding corresponding to to.
 	def automorphism(from : Int, to : Int) : Moebius = {
 	  if(from == to) return Moebius.identity;
 	  
@@ -154,6 +154,8 @@ class CRDTMap (val triangulation : Triangulation, val cross_ratios : Array[Doubl
 	   orElse (next(diag.da).map(_.compose(autos._4)))
 	   ).get
 	}
+  // to choose the best embedding, we go through the diagonals starting from start with map f. For each other diagonal and map f', 
+  // there is a z' such that f(z) = f'(z'), we return z' and the diagonal for the diagonal so that z' is the nearest to the origin.
   def best_diag(z : Complex[Double], start : Int) : (Complex[Double], Int) = {
 	
     def next(i_diag : Int, z0 : Complex[Double]) : (Complex[Double], Int, Double) = {
@@ -223,13 +225,13 @@ class CRDTMap (val triangulation : Triangulation, val cross_ratios : Array[Doubl
   }
   import java.awt.Color;
   import java.awt.image.BufferedImage;
-	
+  // gets an image of the crowding on the polygon
   def getCrowdingImage(width : Int, height : Int, from : Int, poly : Polygon) : BufferedImage = {
 	val image = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
 	
 	
 	val b = poly.bounds;
-	val scaling = new Rect(b.x, b.y + b.height, b.width / width.toDouble, - b.height / height.toDouble);//Rect.getScaleInverse(poly.bounds, new Rect(0, 0, width.toDouble, height.toDouble));
+	val scaling = new Rect(b.x, b.y + b.height, b.width / width.toDouble, - b.height / height.toDouble);
 	
 	val map = getDiskMap(from);
 	    
@@ -261,12 +263,7 @@ class CRDTMap (val triangulation : Triangulation, val cross_ratios : Array[Doubl
 	    
 	    if(dif_angle(a, b) + dif_angle(b, c) + dif_angle(c, d) > Math.PI){
 	      try{
-	        //val guess = map.inverse_euler_tr(w, poly, triangulation, (map.pre_vertices(diag.a) + map.pre_vertices(diag.b)) / 2.0).get;
-	        //val z = map.safe_inverse_newton(w, guess).getOrElse(guess);
-	        
-		    //val z = map.inverse_newton(w, map.inverse_euler(w, poly, triangulation, (map.pre_vertices(diag.a) + map.pre_vertices(diag.b)) / 2.0));
-		      //val z = map.inverse(w, (map.pre_vertices(diag.a) + map.pre_vertices(diag.b)) / 2.0 );
-	          val z = last_z match{
+	    	  val z = last_z match{
 		        case None => map.inverse_newton(w, map.inverse_euler_tr(w, poly, triangulation, 0.0).get);
 		        case Some(guess) => map.inverse_newton(w, map.inverse_euler(w, guess));
 		      }
@@ -288,16 +285,15 @@ class CRDTMap (val triangulation : Triangulation, val cross_ratios : Array[Doubl
 	  }
 	}
 	
-	//val diag = triangulation.nearest_diag(z, poly);
 	return image;
   }
-  
+  // gets an image of the crowding on the disk
   def getDiskCrowdingImage(width : Int, height : Int, from : Int, poly : Polygon) : BufferedImage = {
 	val image = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
 	
 	
 	val b = poly.bounds;
-	val scaling = new Rect(-1, 1, 2 / width.toDouble, - 2 / height.toDouble);//Rect.getScaleInverse(poly.bounds, new Rect(0, 0, width.toDouble, height.toDouble));
+	val scaling = new Rect(-1, 1, 2 / width.toDouble, - 2 / height.toDouble);
 	
 	val map = getDiskMap(from);
 	    
@@ -394,10 +390,7 @@ object CRDTMap{
 import scala.util.Random
 
 object SwingCRDT extends SimpleSwingApplication {
-  /*val ps = Array(new Complex(-1.0, 1.0), new Complex(-1.0, 0.0), new Complex(0.0, 0.0), new Complex(0.0, -1.0), new Complex(1.0, -1.0), new Complex(1.0, 0.0), new Complex(2.0, 0.0), new Complex(2.0, 1.0), new Complex(1.0, 1.0), 
-		  		new Complex(0.0, 2), new Complex(0.0, 1.0));
-  val poly = new Polygon(ps);*/
-  
+
   val poly = Polygon.labyrinth(4, 4, 1.0, new Random(128))._1;
   val crdtmap = CRDTMap.fromPoly(poly);
    
@@ -406,13 +399,9 @@ object SwingCRDT extends SimpleSwingApplication {
   val d0 = crdtmap.getDiskMap(4).getDisplay;
   val d1 = crdtmap.getDiskMap(11).getDisplay;
   
-  //val d1 = crdtmap.getDiskMap(0).getDisplay;
-  
   val display = new DisplayArray(Array(d0, d1));
-  //val display = new DisplayArray(Array(Display.round_grid((x) => x, 1.0, 0.0, 20, 10), 
-  //    new Points(map.pre_vertices)));
+  
   val b = poly.bounds;
-  //val b = new Rect(-1, -1, 2, 2);
     
   val bord : Double = 50;
   
@@ -425,19 +414,16 @@ object SwingCRDT extends SimpleSwingApplication {
     
     contents = new Panel(){
       override def paintComponent(g : Graphics2D){
-    	  //g.setColor(new Color(0, 255, 0, 40));
-    	  
+
     	  val scaling = Rect.getScaleInverse(b, new Rect(bord, bord, size.getWidth() - bord*2, size.getHeight() - bord*2));
     	  /*
     	  val img_x = scaling(Complex(b.x, b.y + b.height));
     	  val img_d = scaling(Complex(b.x + b.width, b.y)) - img_x;
     	  g.drawImage(image, img_x.real.toInt, img_x.imag.toInt, img_d.real.toInt, img_d.imag.toInt, null);
     	  */
-    	  //g.setColor(new Color(0, 0, 0, 100));
     	  
     	  display.display(g, scaling);
     	  
-    	  //g.setColor(new Color(0, 255, 0, 255));
     	  poly.getDisplay.display(g, scaling);
       }
     }
